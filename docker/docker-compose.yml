@@ -1,0 +1,112 @@
+version: '3.8'
+
+services:
+  # Frontend
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    networks:
+      - urge360-network
+    restart: unless-stopped
+
+  # Backend API (placeholder - would be real Node.js app)
+  api:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "echo 'API placeholder - implement with Express/Fastify' && sleep infinity"
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://urge360:secret@postgres:5432/urge360
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - urge360-network
+    restart: unless-stopped
+
+  # PostgreSQL with PostGIS
+  postgres:
+    image: postgis/postgis:15-3.3
+    environment:
+      POSTGRES_USER: urge360
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: urge360
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U urge360"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - urge360-network
+    restart: unless-stopped
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - urge360-network
+    restart: unless-stopped
+
+  # Redis Commander (Redis GUI - dev only)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - urge360-network
+    profiles:
+      - tools
+
+  # pgAdmin (PostgreSQL GUI - dev only)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@urge360.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "8082:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - urge360-network
+    profiles:
+      - tools
+
+volumes:
+  postgres-data:
+  redis-data:
+
+networks:
+  urge360-network:
+    driver: bridge

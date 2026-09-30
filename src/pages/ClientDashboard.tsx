@@ -3,10 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import {
   Zap, Wrench, Package, MapPin, Clock, Star, MessageCircle, ChevronRight,
   AlertTriangle, CheckCircle2, Camera, Mic, Send, ArrowLeft, Phone,
-  Shield, CreditCard, FileText, Home, Bell, LogOut, User, X, Truck
+  Shield, CreditCard, FileText, Home, Bell, LogOut, User, X, Truck, Download
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import type { RepairCategory, Urgency, Order, OrderStatus } from '../types';
+import { Chat } from '../components/Chat';
+import { Signature } from '../components/Signature';
+import { Invoice } from '../components/Invoice';
+import { GuaranteeClaim } from '../components/GuaranteeClaim';
 
 const REPAIR_CATEGORIES: { value: RepairCategory; label: string; icon: string; color: string }[] = [
   { value: 'plumbing', label: 'Fontanería', icon: '🚿', color: 'blue' },
@@ -40,6 +44,10 @@ export function ClientDashboard() {
   const navigate = useNavigate();
   const [view, setView] = useState<'home' | 'repair' | 'courier' | 'tracking' | 'history'>('home');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [showChat, setShowChat] = useState(false);
+  const [showSignature, setShowSignature] = useState(false);
+  const [showInvoice, setShowInvoice] = useState(false);
+  const [showClaim, setShowClaim] = useState(false);
   const notifications = useStore(s => s.notifications);
 
   if (!user) return null;
@@ -86,7 +94,49 @@ export function ClientDashboard() {
         {view === 'home' && <HomeView user={user} activeOrders={activeOrders} setView={setView} setSelectedOrder={setSelectedOrder} orders={orders} users={users} />}
         {view === 'repair' && <RepairFlow setView={setView} setSelectedOrder={setSelectedOrder} />}
         {view === 'courier' && <CourierFlow setView={setView} setSelectedOrder={setSelectedOrder} />}
-        {view === 'tracking' && selectedOrder && <TrackingView order={selectedOrder} users={users} setView={setView} />}
+        {view === 'tracking' && selectedOrder && (
+          <TrackingView
+            order={selectedOrder}
+            users={users}
+            setView={setView}
+            onOpenChat={() => setShowChat(true)}
+            onOpenSignature={() => setShowSignature(true)}
+            onOpenInvoice={() => setShowInvoice(true)}
+            onOpenClaim={() => setShowClaim(true)}
+          />
+        )}
+        {/* Modals */}
+        {selectedOrder && user && (
+          <>
+            <Chat
+              orderId={selectedOrder.id}
+              currentUserId={user.id}
+              currentUserRole="client"
+              professionalName={users.find(u => u.id === selectedOrder.professionalId)?.name || 'Profesional'}
+              isOpen={showChat}
+              onClose={() => setShowChat(false)}
+            />
+            <Signature
+              isOpen={showSignature}
+              onClose={() => setShowSignature(false)}
+              onSign={(data) => {
+                useStore.getState().addEvidence(selectedOrder.id, { type: 'signature', data, by: user.id });
+              }}
+            />
+            <Invoice
+              order={selectedOrder}
+              client={user}
+              professional={users.find(u => u.id === selectedOrder.professionalId)}
+              isOpen={showInvoice}
+              onClose={() => setShowInvoice(false)}
+            />
+            <GuaranteeClaim
+              orderId={selectedOrder.id}
+              isOpen={showClaim}
+              onClose={() => setShowClaim(false)}
+            />
+          </>
+        )}
         {view === 'history' && <HistoryView orders={orders} users={users} setSelectedOrder={setSelectedOrder} setView={setView} />}
       </main>
     </div>
@@ -529,7 +579,7 @@ function CourierFlow({ setView, setSelectedOrder }: { setView: (v: any) => void;
 }
 
 // ===== TRACKING VIEW =====
-function TrackingView({ order, users, setView }: { order: Order; users: any[]; setView: (v: any) => void }) {
+function TrackingView({ order, users, setView, onOpenChat, onOpenSignature, onOpenInvoice, onOpenClaim }: { order: Order; users: any[]; setView: (v: any) => void; onOpenChat: () => void; onOpenSignature: () => void; onOpenInvoice: () => void; onOpenClaim: () => void }) {
   const pro = users.find(u => u.id === order.professionalId);
   const updateOrderStatus = useStore(s => s.updateOrderStatus);
   const addEvidence = useStore(s => s.addEvidence);
@@ -702,6 +752,30 @@ function TrackingView({ order, users, setView }: { order: Order; users: any[]; s
           <button onClick={handleRate} disabled={rating === 0} className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 py-2 rounded-lg text-sm font-medium transition">Enviar valoración</button>
         </div>
       )}
+
+      {/* Action buttons */}
+      <div className="grid grid-cols-2 gap-3">
+        {order.professionalId && !['paid', 'rated', 'cancelled'].includes(order.status) && (
+          <button onClick={onOpenChat} className="bg-slate-900 border border-slate-800 hover:border-orange-500/30 py-3 rounded-xl text-sm font-medium transition flex items-center justify-center gap-2">
+            <MessageCircle className="w-4 h-4" /> Chat
+          </button>
+        )}
+        {order.type === 'courier' && order.status === 'delivered' && (
+          <button onClick={onOpenSignature} className="bg-slate-900 border border-slate-800 hover:border-blue-500/30 py-3 rounded-xl text-sm font-medium transition flex items-center justify-center gap-2">
+            ✍️ Firma
+          </button>
+        )}
+        {['paid', 'rated'].includes(order.status) && (
+          <>
+            <button onClick={onOpenInvoice} className="bg-slate-900 border border-slate-800 hover:border-green-500/30 py-3 rounded-xl text-sm font-medium transition flex items-center justify-center gap-2">
+              <FileText className="w-4 h-4" /> Factura
+            </button>
+            <button onClick={onOpenClaim} className="bg-slate-900 border border-slate-800 hover:border-yellow-500/30 py-3 rounded-xl text-sm font-medium transition flex items-center justify-center gap-2">
+              <Shield className="w-4 h-4" /> Garantía
+            </button>
+          </>
+        )}
+      </div>
 
       {/* Simulate advance (demo) */}
       {!['paid', 'rated', 'cancelled'].includes(order.status) && (

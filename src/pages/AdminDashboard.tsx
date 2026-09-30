@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Zap, Users, Package, Wrench, Settings, DollarSign, Shield, BarChart3, LogOut, TrendingUp, AlertTriangle, CheckCircle2, Database, FileText } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { HealthChecks } from '../components/HealthChecks';
+import { FeatureFlags } from '../components/FeatureFlags';
+import { CircuitBreakerPanel } from '../components/CircuitBreaker';
 
 export function AdminDashboard() {
   const user = useStore(s => s.currentUser);
@@ -10,7 +13,7 @@ export function AdminDashboard() {
   const professionals = useStore(s => s.professionals);
   const auditLogs = useStore(s => s.auditLogs);
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'providers' | 'pricing' | 'compliance' | 'audit'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'providers' | 'pricing' | 'compliance' | 'audit' | 'health' | 'features' | 'resilience'>('overview');
 
   if (!user) return null;
 
@@ -48,6 +51,9 @@ export function AdminDashboard() {
               { id: 'pricing', icon: DollarSign, label: 'Tarifas' },
               { id: 'compliance', icon: Shield, label: 'Compliance' },
               { id: 'audit', icon: FileText, label: 'Auditoría' },
+              { id: 'health', icon: Zap, label: 'Health' },
+              { id: 'features', icon: Settings, label: 'Features' },
+              { id: 'resilience', icon: AlertTriangle, label: 'Resilience' },
             ].map(item => (
               <button key={item.id} onClick={() => setActiveTab(item.id as any)} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${activeTab === item.id ? 'bg-purple-500/10 text-purple-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
                 <item.icon className="w-4 h-4" /> {item.label}
@@ -59,7 +65,7 @@ export function AdminDashboard() {
         {/* Mobile tabs */}
         <div className="lg:hidden fixed top-14 left-0 right-0 bg-slate-900 border-b border-slate-800 px-4 py-2 overflow-x-auto z-30">
           <div className="flex gap-2">
-            {['overview', 'users', 'providers', 'pricing', 'compliance', 'audit'].map(tab => (
+            {['overview', 'users', 'providers', 'pricing', 'compliance', 'audit', 'health', 'features', 'resilience'].map(tab => (
               <button key={tab} onClick={() => setActiveTab(tab as any)} className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap ${activeTab === tab ? 'bg-purple-500 text-white' : 'bg-slate-800 text-slate-400'}`}>
                 {tab}
               </button>
@@ -305,6 +311,52 @@ export function AdminDashboard() {
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'health' && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-bold">Estado del sistema</h2>
+              <HealthChecks />
+            </div>
+          )}
+
+          {activeTab === 'features' && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-bold">Feature Flags</h2>
+              <FeatureFlags />
+            </div>
+          )}
+
+          {activeTab === 'resilience' && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-bold">Resiliencia y Circuit Breakers</h2>
+              <CircuitBreakerPanel />
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 mt-4">
+                <h3 className="font-medium mb-3">Estrategia de recuperación</h3>
+                <div className="space-y-2 text-sm text-slate-300">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-400 mt-0.5" />
+                    <span><strong>Fallback seguro:</strong> Si falla el LLM, usar reglas deterministas para triage y pricing</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-400 mt-0.5" />
+                    <span><strong>Queue + Retry:</strong> Operaciones asíncronas con reintentos exponenciales</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-400 mt-0.5" />
+                    <span><strong>Dead Letter Queue:</strong> Mensajes fallidos tras N reintentos van a DLQ para revisión manual</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-400 mt-0.5" />
+                    <span><strong>Circuit Breakers:</strong> Protección contra fallos en cascada en servicios externos</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-400 mt-0.5" />
+                    <span><strong>Health Checks:</strong> Monitoreo continuo con alertas automáticas</span>
+                  </div>
+                </div>
               </div>
             </div>
           )}
